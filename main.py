@@ -2,6 +2,11 @@
 example:
 
 python main.py --baseurl https://www.kayak.de/flights --destination JFK --origin=BER -rd 2022-11-13 -dd 2022-11-06
+
+kill drivers when done:
+
+pkill -f /Applications/Google Chrome.app
+pkill -f drivers/chromedriver
 """
 
 # std
@@ -30,6 +35,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 chrome_options = webdriver.ChromeOptions()
 # s = Service("")
 # driver = webdriver.Chrome(service=s)
+# ~/.wdm/drivers/chromedriver/mac64/105.0.5195/chromedriver
 driver = webdriver.Chrome(ChromeDriverManager().install())
 driver.implicitly_wait(20)
 
