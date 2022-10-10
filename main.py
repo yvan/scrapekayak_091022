@@ -8,6 +8,7 @@ python main.py --baseurl https://www.kayak.de/flights --destination JFK --origin
 import os
 import re
 import sys
+import time
 import pathlib
 import argparse
 import datetime
@@ -27,6 +28,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # setup global web driver code
 chrome_options = webdriver.ChromeOptions()
+# s = Service("")
+# driver = webdriver.Chrome(service=s)
 driver = webdriver.Chrome(ChromeDriverManager().install())
 driver.implicitly_wait(20)
 
@@ -50,9 +53,20 @@ def loadPage(url):
 def getText(seq):
     return [s.getText() for s in seq]
 
-def currencyParse(currencyStr, dropchange=False):
-    price, change = currencyStr[:-3], currencyStr[-2:]
-    price = re.sub("[.,]", "", price)
+
+"""
+1.171
+1.171,54
+1.171,5
+"""
+def currencyParse(currencyStr, dropchange=True):
+    priceChange = currencyStr.split(",")
+    if len(priceChange) > 1:
+        price = re.sub("[.,]", "", priceChange[0])
+        change = priceChange[1]
+    else:
+        price = re.sub("[.,]", "", priceChange[0])
+        change = 0
     if dropchange:
         return price
     return f"{price}.{change}"
@@ -61,26 +75,29 @@ def currencyParse(currencyStr, dropchange=False):
 if __name__ == "__main__":
     # process arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s","--savepath",
+    parser.add_argument("-s","--sleeptime",default=30)
+    parser.add_argument("-p","--savepath",
                         default=os.path.expanduser("~/projects/datasets/scrapekayak_071022/"))
     parser.add_argument("-b","--baseurl", default="https://www.kayak.de/flights")
-    parser.add_argument("-o","--origin")
-    parser.add_argument("-d","--destination")
-    parser.add_argument("-rd","--return")
-    parser.add_argument("-dd","--depart")
+    parser.add_argument("-o","--origin", default="BER")
+    parser.add_argument("-d","--destination", default="JFK")
+    parser.add_argument("-rd","--dreturn", default="2022-11-13")
+    parser.add_argument("-dd","--ddepart", default="2022-11-06")
     arguments = parser.parse_args()
     
     # setup
     DATAPATH = arguments.savepath        
     baseUrl = arguments.baseurl
-    ddate = "2022-11-06"
-    rdate = "2022-11-13"
-    origin = "BER"
-    destination = "JFK"
+    ddate = arguments.ddepart
+    rdate = arguments.dreturn
+    origin = arguments.origin
+    destination = arguments.destination
 
     # get the page
     url = buildUrl(baseUrl, origin, ddate, destination, rdate)
     loadPage(url)
+    print(f"Sleeping for {arguments.sleeptime} seconds to load page data...")
+    time.sleep(arguments.sleeptime)
 
     # if the page has no results (nonsense inputs or error)
 
