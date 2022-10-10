@@ -1,8 +1,16 @@
+"""
+example:
+
+python main.py --baseurl https://www.kayak.de/flights --destination JFK --origin=BER -rd 2022-11-13 -dd 2022-11-06
+"""
+
 # std
 import os
 import re
 import sys
-import getopt
+import pathlib
+import argparse
+import datetime
 
 # numerical
 import numpy as np
@@ -41,22 +49,45 @@ def loadPage(url):
 
 def getText(seq):
     return [s.getText() for s in seq]
+
+def currencyParse(currencyStr, dropchange=False):
+    price, change = currencyStr[:-3], currencyStr[-2:]
+    price = re.sub("[.,]", "", price)
+    if dropchange:
+        return price
+    return f"{price}.{change}"
+    
         
 if __name__ == "__main__":
+    # process arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s","--savepath",
+                        default=os.path.expanduser("~/projects/datasets/scrapekayak_071022/"))
+    parser.add_argument("-b","--baseurl", default="https://www.kayak.de/flights")
+    parser.add_argument("-o","--origin")
+    parser.add_argument("-d","--destination")
+    parser.add_argument("-rd","--return")
+    parser.add_argument("-dd","--depart")
+    arguments = parser.parse_args()
+    
+    # setup
+    DATAPATH = arguments.savepath        
+    baseUrl = arguments.baseurl
     ddate = "2022-11-06"
     rdate = "2022-11-13"
     origin = "BER"
     destination = "JFK"
-    baseUrl = "https://www.kayak.de/flights"
 
-    # urlS = buildUrl(baseUrl, origin, ddate)
+    # get the page
     url = buildUrl(baseUrl, origin, ddate, destination, rdate)
     loadPage(url)
 
-    # get webpage
+    # if the page has no results (nonsense inputs or error)
+
+    # cook a soup
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
-    # first get all the divs containing times/prices, etc
+    # first get all the divs containing results
     results = soup.find_all('div', attrs={"class":"resultInner"})
 
     # then search the results for things
@@ -66,13 +97,18 @@ if __name__ == "__main__":
     for res in results:
         # time
         timeDivs = res.find_all('span', attrs={"class":"base-time"})
-        rawtimes.append([getText([timeDivs[i], timeDivs[i+1]]) for i in range(0,len(timeDivs),2)])
-        # price values and currencies split up
+        rawtimes.append(getText((timeDivs[0], timeDivs[1])))
+        
+        # prices and currencies, split up
         priceElems = res.find_all('span', attrs={"id":re.compile("([a-zA-Z0-9\-]+)price-text")})
         priceTexts = [span.getText().split() for span in priceElems]
-        priceValue = [int(p) for p,_ in priceTexts]
+        priceValue = []
+        for p,_ in priceTexts:
+            try:
+                priceValue.append(int(p))
+            except ValueError:
+                priceValue.append(int(currencyParse(p)))
         priceCurrency = [v for _, v in priceTexts]
-        
         bestpriceIdx, worstpriceIdx = np.argmin(priceValue), np.argmax(priceValue)
         rawprice.append([priceValue[bestpriceIdx], priceValue[worstpriceIdx]])
         currency.append([priceCurrency[bestpriceIdx], priceCurrency[worstpriceIdx]])
@@ -80,23 +116,12 @@ if __name__ == "__main__":
     times = np.array(rawtimes)
     prices = np.array(rawprice)
     currencies = np.array(currency)
-
-    x = 5
-
-
-    # # times
-    # departArriveClass = {"class":"base-time".split()}
-    # timeDivs = soup.find_all('span', attrs=departArriveClass)
-    # rawtimes = [getText([timeDivs[i], timeDivs[i+1]]) for i in range(0,len(timeDivs),2)]
-    # times = np.array(rawtimes)
-
-    # # prices
-    # regex = re.compile(r'.*-price-text')
-    # priceClasses = {"class": regex}
-    # priceDivs = soup.find_all('span', attrs=priceClasses)
-    # rawPrices = [getText([priceDivs[i],priceDivs[i+1]]) for i in range(0,len(priceDivs))]
-    # prices = np.array(rawPrices)
+    sources = np.array(times.shape[0]*[[origin]])
+    destinations = np.array(times.shape[0]*[[destination]])
+    flightdata = np.hstack((sources, destinations, rawtimes, rawprice, currency,))
     
-    # longparams = ["origin=", "destination="]
-    # result = getopt.getopt(sys.argv[1:], "", longparams)
+    # combine and save to csv    
+    today = datetime.datetime.today().strftime("%Y-%m-%d-%H:%M:%S")
+    path = pathlib.Path(DATAPATH, f'kayak_{today}_{origin}_{ddate}_{destination}_{rdate}.csv')
+    np.savetxt(path, flightdata, delimiter=",", fmt="%s")
     
