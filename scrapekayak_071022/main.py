@@ -21,13 +21,14 @@ import datetime
 # numerical
 import numpy as np
 
-# bs
+# html
 from bs4 import BeautifulSoup
 
 # selenium
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
+
 # web driver
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -61,6 +62,9 @@ def getText(seq):
 
 
 """
+This function parses string currency data. An example of currency
+formats we can parse here:
+
 1.171
 1.171,54
 1.171,5
